@@ -51,6 +51,75 @@ const registerUser = asyncHandler(async (req, res) => {
         password
     });
 
+    const emailToken = user.generateEmailVerificationToken();
+    await user.save();
+
+    const emailVerificationLink = `${process.env.CORS_ORIGIN}/verify-email/${emailToken}`;
+
+    const subject = 'Verify Your Email';
+    const message = `
+        <!DOCTYPE html>
+        <html>
+            <head>
+                <style>
+                    .email-container {
+                        font-family: Arial, sans-serif;
+                        line-height: 1.6;
+                    }
+                    .email-header {
+                        background-color: #f8f9fa;
+                        padding: 20px;
+                        text-align: center;
+                    }
+                    .email-content {
+                        padding: 20px;
+                    }
+                    .email-footer {
+                        margin-top: 20px;
+                        padding: 20px;
+                        background-color: #f8f9fa;
+                        text-align: center;
+                    }
+                    .verify-button {
+                        display: inline-block;
+                        padding: 10px 20px;
+                        color: white;
+                        background-color: #007bff;
+                        text-decoration: none;
+                        border-radius: 5px;
+                    }
+                    .verify-link {
+                        color: #007bff;
+                        text-decoration: underline;
+                    }
+                </style>
+            </head>
+            <body>
+                <div class="email-container">
+                    <div class="email-header">
+                        <h2>Verify Your Email Address</h2>
+                    </div>
+                    <div class="email-content">
+                        <p>Hi ${user.name},</p>
+                        <p>Thank you for registering with us. To complete your registration, please verify your email address by clicking the button below:</p>
+                        <p>
+                            <a href="${emailVerificationLink}" class="verify-button" target="_blank">Verify Email</a>
+                        </p>
+                        <p>If the button above does not work, please copy and paste the following link into your browser:</p>
+                        <p>
+                            <a href="${emailVerificationLink}" class="verify-link" target="_blank">${emailVerificationLink}</a>
+                        </p>
+                    </div>
+                    <div class="email-footer">
+                        <p>If you did not create an account with us, please ignore this email.</p>
+                    </div>
+                </div>
+            </body>
+        </html>
+        `;
+
+    await sendEmail(email, subject, message);
+
     const newUser = await User.findById(user._id).select('-password');
     if(!newUser) {
         throw new ApiError(404, 'Something went wrong while registering the user.');
@@ -135,6 +204,148 @@ const logoutUser = asyncHandler(async (req, res) => {
 });
 
 /*
+    Controller function to verify the email of a user.
+    Handles the HTTP POST request to verify the email of a user.
+
+    @param {Object} req - Express request object.
+    @param {Object} res - Express response object.
+    @returns {Object} JSON response indicating success or failure.
+*/
+const verifyEmail = asyncHandler(async (req, res) => {
+
+    const { emailToken } = req.params;
+
+    const hashedEmailToken = crypto.createHash('sha256').update(emailToken).digest('hex');
+
+    // Find and update the user in one query to avoid multiple database round trips
+    const user = await User.findOneAndUpdate(
+        {
+            emailVerificationToken: hashedEmailToken,
+            emailVerificationExpiry: { $gt: Date.now() }
+        },
+        {
+            $set: {
+                userVerified: true,
+                emailVerificationToken: null,
+                emailVerificationExpiry: null
+            }
+        },
+        { 
+            new: true, 
+            select: '-password' 
+        }
+    );
+
+    if (!user) {
+        return res
+            .status(401)
+            .json(new ApiResponse(401, null, "Invalid or expired token. Please try again."));
+    }
+
+    return res
+        .status(200)
+        .json(new ApiResponse(200, user, "Email verification successful."));
+});
+
+/*
+    Controller function to resend verification email link.
+    Handles the HTTP POST request to resend verification email link.
+
+    @param {Object} req - Express request object.
+    @param {Object} res - Express response object.
+    @returns {Object} JSON response indicating success or failure.
+*/
+const resendVerificationEmail = asyncHandler(async (req, res) => {
+    
+    const { id } = req.user;
+
+    const user = await User.findById(id);
+    if(!user) {
+        throw new ApiError(404, 'User is not logged in, Please login or does not exist.');
+    }
+
+    if(user.userVerified) {
+        return res
+        .status(200)
+        .json(new ApiResponse(200, null, 'User is already verified.'));
+    }
+
+    const emailToken = user.generateEmailVerificationToken();
+    await user.save();
+    
+    const emailVerificationLink = `${process.env.CORS_ORIGIN}/verify-email/${emailToken}`;
+    
+    const email = user.email;
+    const subject = 'Verify Your Email';
+    const message = `
+        <!DOCTYPE html>
+        <html>
+            <head>
+                <style>
+                    .email-container {
+                        font-family: Arial, sans-serif;
+                        line-height: 1.6;
+                    }
+                    .email-header {
+                        background-color: #f8f9fa;
+                        padding: 20px;
+                        text-align: center;
+                    }
+                    .email-content {
+                        padding: 20px;
+                    }
+                    .email-footer {
+                        margin-top: 20px;
+                        padding: 20px;
+                        background-color: #f8f9fa;
+                        text-align: center;
+                    }
+                    .verify-button {
+                        display: inline-block;
+                        padding: 10px 20px;
+                        color: white;
+                        background-color: #007bff;
+                        text-decoration: none;
+                        border-radius: 5px;
+                    }
+                    .verify-link {
+                        color: #007bff;
+                        text-decoration: underline;
+                    }
+                </style>
+            </head>
+            <body>
+                <div class="email-container">
+                    <div class="email-header">
+                        <h2>Verify Your Email Address</h2>
+                    </div>
+                    <div class="email-content">
+                        <p>Hi ${user.name},</p>
+                        <p>Thank you for registering with us. To complete your registration, please verify your email address by clicking the button below:</p>
+                        <p>
+                            <a href="${emailVerificationLink}" class="verify-button" target="_blank">Verify Email</a>
+                        </p>
+                        <p>If the button above does not work, please copy and paste the following link into your browser:</p>
+                        <p>
+                            <a href="${emailVerificationLink}" class="verify-link" target="_blank">${emailVerificationLink}</a>
+                        </p>
+                    </div>
+                    <div class="email-footer">
+                        <p>If you did not create an account with us, please ignore this email.</p>
+                    </div>
+                </div>
+            </body>
+        </html>
+        `;
+    
+    await sendEmail(email, subject, message);
+    
+    return res
+        .status(200)
+        .json(new ApiResponse(200, null, 'Email verification link sent successfully.'));
+});
+
+/*
     Controller function to change user password.
     Handles the HTTP POST request to change the password.
 
@@ -209,8 +420,67 @@ const forgotPassword = asyncHandler(async (req, res) => {
 
     const passwordResetLink = `${process.env.CORS_ORIGIN}/reset-password/${resetToken}`;
 
-    const subject = 'Password reset request';
-    const message = `You have requested to reset your password. Please click the following link to reset your password: <a href="${passwordResetLink}" target="_blank">Reset Password</a>. If the link is not clickable, please copy and paste it into your browser.`
+    const subject = 'Password Reset Request';
+    const message = `
+        <!DOCTYPE html>
+        <html>
+            <head>
+                <style>
+                    .email-container {
+                        font-family: Arial, sans-serif;
+                        line-height: 1.6;
+                    }
+                    .email-header {
+                        background-color: #f8f9fa;
+                        padding: 20px;
+                        text-align: center;
+                    }
+                    .email-content {
+                        padding: 20px;
+                    }
+                    .email-footer {
+                        margin-top: 20px;
+                        padding: 20px;
+                        background-color: #f8f9fa;
+                        text-align: center;
+                    }
+                    .reset-button {
+                        display: inline-block;
+                        padding: 10px 20px;
+                        color: white;
+                        background-color: #dc3545;
+                        text-decoration: none;
+                        border-radius: 5px;
+                    }
+                    .reset-link {
+                        color: #dc3545;
+                        text-decoration: underline;
+                    }
+                </style>
+            </head>
+            <body>
+                <div class="email-container">
+                    <div class="email-header">
+                        <h2>Password Reset Request</h2>
+                    </div>
+                    <div class="email-content">
+                        <p>Hi ${user.name},</p>
+                        <p>We received a request to reset your password. Click the button below to reset your password:</p>
+                        <p
+                            <a href="${passwordResetLink}" class="reset-button" target="_blank">Reset Password</a>
+                        </p>
+                        <p>If the button above does not work, please copy and paste the following link into your browser:</p>
+                        <p>
+                            <a href="${passwordResetLink}" class="reset-link" target="_blank">${passwordResetLink}</a>
+                        </p>
+                    </div>
+                    <div class="email-footer">
+                        <p>If you did not request a password reset, please ignore this email.</p>
+                    </div>
+                </div>
+            </body>
+        </html>
+        `;
 
     await sendEmail(email, subject, message);
 
@@ -242,7 +512,7 @@ const resetPassword = asyncHandler(async (req, res) => {
     const user = await User
         .findOne({
             forgotPasswordToken: hashedResetToken,
-            forgotPasswordExpiryDate: { $gt: Date.now() }
+            forgotPasswordExpiry: { $gt: Date.now() }
         })
         .select('-password');
     if (!user) {
@@ -261,7 +531,7 @@ const resetPassword = asyncHandler(async (req, res) => {
             $set: { 
                 password: hashedPassword, 
                 forgotPasswordToken: null, 
-                forgotPasswordExpiryDate: null 
+                forgotPasswordExpiry: null 
             } 
         },
         { new: true } 
@@ -298,5 +568,5 @@ const userDetails = asyncHandler(async (req, res) => {
 });
 
 // Exporting functions related to user authentication and management
-export { registerUser, loginUser, logoutUser, changePassword, forgotPassword, resetPassword, userDetails };
+export { registerUser, loginUser, logoutUser, verifyEmail, resendVerificationEmail, changePassword, forgotPassword, resetPassword, userDetails };
 

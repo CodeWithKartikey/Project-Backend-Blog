@@ -8,6 +8,8 @@ import {
     registerUser,
     loginUser,
     logoutUser,
+    verifyEmail,
+    resendVerificationEmail,
     changePassword,
     forgotPassword,
     resetPassword,
@@ -26,6 +28,10 @@ router.post('/register', registerUser);
 router.post('/login', loginUser);
 // Route for user logout
 router.get('/logout', isLoggedIn, logoutUser);
+// Route for verify email using the token
+router.post('/verify-email/:emailToken', verifyEmail);
+// Route for resend verification email
+router.post('/resend-verification-email', isLoggedIn, resendVerificationEmail);
 // Route for changing user password
 router.post('/change-password', isLoggedIn, changePassword);
 // Route for requesting a password reset

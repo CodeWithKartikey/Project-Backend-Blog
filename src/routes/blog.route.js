@@ -25,11 +25,11 @@ const router = Router();
 router.get('/get-all-blogs', getAllBlogs);
 // Route for get all blogs to its owner
 router.get('/get-blogs', isLoggedIn, getBlogs);
-// Route for add a task
+// Route for add a blog
 router.post('/add-blog', isLoggedIn, upload.single('thumbnail'), addBlog);
-// Route for update task status
+// Route for update a blog
 router.put('/update-blog/:blogId', isLoggedIn, upload.single('thumbnail'), updateBlog);
-// Route for delete a task
+// Route for delete a blog
 router.delete('/delete-blog/:blogId', isLoggedIn, deleteBlog);
 
 // Export default this router object
