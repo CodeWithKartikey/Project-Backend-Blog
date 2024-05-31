@@ -1,7 +1,8 @@
-# Project-Backend-Blog-App
+# Project-Backend-Blog
 
 ## Description
 
+This repository serves as the backend for a sophisticated blogging application. It provides a robust API for managing users and blog posts.
 This repository serves as the backend for a sophisticated blogging application. It provides a robust API for managing users and blog posts.
 
 ## Features
@@ -22,6 +23,7 @@ This repository serves as the backend for a sophisticated blogging application. 
 - **mongoose**: For modeling application data and interacting with MongoDB.
 - **morgan**: For HTTP request logging during development.
 - **multer**: For handling multipart/form-data, primarily used for uploading files.
+- **nodemailer**: For sending emails for various things.
 - **nodemailer**: For sending emails for various things.
 
 ## Installation
@@ -107,6 +109,7 @@ This project is licensed under the MIT License.
 
 ---
 
+Designed, Developed & Maintained by CodeWithKartikey - Happy coding. 🚀
 Designed, Developed & Maintained by CodeWithKartikey - Happy coding. 🚀
 
 ---
